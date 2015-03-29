@@ -64,7 +64,7 @@ public:
 				0.0, 0.0, 0.0, 0.0, 0.0, 2.0};
 
 
-    
+    sleep(1);
     init_pub.publish( ini_pose );
     ROS_INFO("amcl init!");
     cout << "now_pose:( " << ini_pose.pose.pose.position.x << "," << ini_pose.pose.pose.position.y << " )" <<endl;
