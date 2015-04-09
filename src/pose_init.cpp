@@ -12,67 +12,76 @@ class PoseInit
 {
 private:
   ros::NodeHandle nh;
+  ros::NodeHandle nh_p;
   ros::Subscriber amcl_sub;
   ros::Publisher init_pub;
   ros::ServiceServer init_srv;
+  ros::ServiceClient clear_costmap_local_clt;
 
+  double sig_param;
+  double sig_deg_param;
 
 public:
-  PoseInit()
+  PoseInit():
+    nh_p("~"),
+    sig_param(0.2),
+    sig_deg_param(90)
   {
+    nh_p.param("sigma", sig_param, sig_param);
+    nh_p.param("sigma_deg", sig_deg_param, sig_deg_param);
+
     amcl_sub 
       = nh.subscribe("amcl_pose", 1, &PoseInit::callback, this);
     init_pub 
       = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("initialpose", 1);
     init_srv 
       = nh.advertiseService("pose_init_srv", &PoseInit::sendData, this); 
+
+    clear_costmap_local_clt 
+      = nh.serviceClient<std_srvs::Empty>("/move_base/clear_costmap_local");
   }
 
   void callback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose)
   {
-    //ini_pose.header = pose->header;
-    //ini_pose.pose.pose = pose->pose.pose;
     ini_pose = *pose;
   }  
 
   bool sendData(std_srvs::Empty::Request& req,
 		std_srvs::Empty::Response& res)
   {
-    ros::ServiceClient clear_unknown_space_clt 
-      = nh.serviceClient<std_srvs::Empty>("clear_unknown_space");
-    ros::ServiceClient clear_costmaps_clt 
-      = nh.serviceClient<std_srvs::Empty>("clear_costmaps");
-
     std_srvs::Empty emp;
 
-    clear_unknown_space_clt.call( emp );
-    clear_costmaps_clt.call( emp );
-    /*
-    double cov[36] =  {20*20, 0, 0, 0, 0, 0, 
-		       0, 20*20, 0, 0, 0, 0, 
-		       0, 0, 0, 0, 0, 0,
-		       0, 0, 0, 0, 0, 0,
-		       0, 0, 0, 0, 0, 0,
-		       0, 0, 0, 0, 0, 2}; 
-    */
-    
-    ini_pose.pose.covariance = {0.2*0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 
-				0.0, 0.2*0.2, 0.0, 0.0, 0.0, 0.0, 
-				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.0, 0.0, 0.0, 0.0, 0.0, 2.0};
+    double sigma = sig_param;
+    double rad_sigma = (double)sig_deg_param*(M_PI/180.);
 
+    ini_pose.pose.covariance = {sigma * sigma, 0.0, 0.0, 0.0, 0.0, 0.0, 
+				0.0, sigma * sigma, 0.0, 0.0, 0.0, 0.0, 
+				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.0, 0.0, 0.0, 0.0, 0.0, rad_sigma * rad_sigma};
 
+   
     sleep(1);
     init_pub.publish( ini_pose );
     ROS_INFO("amcl init!");
-    cout << "now_pose:( " << ini_pose.pose.pose.position.x << "," << ini_pose.pose.pose.position.y << " )" <<endl;
-    for(int i = 0; i<36; ++i) 
-      cout<< "covariance[ "<< i << " ]: " << ini_pose.pose.covariance[i] << endl;
+    cout << "now_sigma:( "
+	 << sigma
+	 << ","
+	 << sig_deg_param
+	 << "<rad: "
+	 << rad_sigma
+	 << "> ), now_pose:( " 
+	 << ini_pose.pose.pose.position.x 
+	 << "," 
+	 << ini_pose.pose.pose.position.y 
+	 << " )" 
+	 << endl;
+
+    clear_costmap_local_clt.call( emp );
+
     return true;
   }  
-
 
 };
 
